@@ -337,7 +337,6 @@ int SslBox_t::GetPlaintext (char *buf, int bufsize)
           ERR_print_errors_fp (stderr);
         default:
           return -2;
-        }
 			}
 		}
 		bHandshakeCompleted = true;
