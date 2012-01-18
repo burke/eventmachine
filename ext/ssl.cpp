@@ -268,8 +268,13 @@ SslBox_t::SslBox_t (bool is_server, const string &privkeyfile, const string &cer
 	if (bVerifyPeer)
 		SSL_set_verify(pSSL, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, ssl_verify_wrapper);
 
-	if (!bIsServer)
-		SSL_connect (pSSL);
+  if (bIsServer)
+    SSL_set_accept_state (pSSL);
+  else
+    SSL_set_connect_state (pSSL);
+
+  SSL_do_handshake (pSSL);
+
 }
 
 
@@ -315,32 +320,34 @@ SslBox_t::GetPlaintext
 
 int SslBox_t::GetPlaintext (char *buf, int bufsize)
 {
-	if (!SSL_is_init_finished (pSSL)) {
-		int e = bIsServer ? SSL_accept (pSSL) : SSL_connect (pSSL);
-		if (e < 0) {
+  if (!bHandshakeCompleted) {
+    int e = SSL_do_handshake (pSSL);
+    if (e <= 0) {
 			int er = SSL_get_error (pSSL, e);
-			if (er != SSL_ERROR_WANT_READ) {
+      switch (er) {
 				// Return -1 for a nonfatal error, -2 for an error that should force the connection down.
-				return (er == SSL_ERROR_SSL) ? (-2) : (-1);
+        case SSL_ERROR_NONE:
+          break;
+
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_WRITE:
+          return -1;
+
+        case SSL_ERROR_SSL:
+          ERR_print_errors_fp (stderr);
+        default:
+          return -2;
+        }
 			}
-			else
-				return 0;
 		}
 		bHandshakeCompleted = true;
 		// If handshake finished, FALL THROUGH and return the available plaintext.
 	}
 
-	if (!SSL_is_init_finished (pSSL)) {
-		// We can get here if a browser abandons a handshake.
-		// The user can see a warning dialog and abort the connection.
-		cerr << "<SSL_incomp>";
-		return 0;
-	}
-
 	//cerr << "CIPH: " << SSL_get_cipher (pSSL) << endl;
 
 	int n = SSL_read (pSSL, buf, bufsize);
-	if (n >= 0) {
+	if (n > 0) {
 		return n;
 	}
 	else {
