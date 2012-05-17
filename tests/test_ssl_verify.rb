@@ -1,5 +1,7 @@
 require 'em_test_helper'
 
+CAFILE = File.expand_path('../../cacert.pem', __FILE__)
+
 if EM.ssl?
   class TestSslVerify < Test::Unit::TestCase
     def setup
@@ -9,7 +11,7 @@ if EM.ssl?
 
     module Client
       def connection_completed
-        start_tls(:private_key_file => $dir+'client.key', :cert_chain_file => $dir+'client.crt')
+        start_tls(:private_key_file => $dir+'client.key', :cert_chain_file => $dir+'client.crt', :ca_file => CAFILE)
       end
 
       def ssl_handshake_completed
